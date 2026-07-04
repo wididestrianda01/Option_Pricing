@@ -35,7 +35,17 @@ def build_synthetic_smile(
 
 
 def invert_iv_surface(synthetic_smile_dict: dict) -> dict | None:
-    """Recover sigma_true from price via the IV solver; report recovery error."""
+    """Recover sigma_true from price via the IV solver; report recovery error.
+
+    Raises ValueError if required keys are missing from synthetic_smile_dict.
+    IV solver failures (None returns) are stored as np.nan; error metrics use NaN-aware reductions.
+    """
+    # Validate required keys
+    required_keys = {"spot", "rate", "strikes", "maturities", "price", "sigma_true"}
+    missing_keys = required_keys - set(synthetic_smile_dict.keys())
+    if missing_keys:
+        raise ValueError(f"Missing required keys in synthetic_smile_dict: {sorted(missing_keys)}")
+
     spot, rate = synthetic_smile_dict["spot"], synthetic_smile_dict["rate"]
     strikes, maturities = synthetic_smile_dict["strikes"], synthetic_smile_dict["maturities"]
     price, sigma_true = synthetic_smile_dict["price"], synthetic_smile_dict["sigma_true"]
@@ -43,12 +53,14 @@ def invert_iv_surface(synthetic_smile_dict: dict) -> dict | None:
     sigma_hat = np.zeros_like(sigma_true)
     for i, tmat in enumerate(maturities):
         for k, strike in enumerate(strikes):
-            sigma_hat[i, k] = implied_volatility(price[i, k], spot, strike, rate, tmat)
+            iv = implied_volatility(price[i, k], spot, strike, rate, tmat)
+            # Store np.nan if IV solver fails (returns None), otherwise store the IV
+            sigma_hat[i, k] = np.nan if iv is None else iv
 
     abs_error = np.abs(sigma_hat - sigma_true)
     return {
         "sigma_hat": sigma_hat, "sigma_true": sigma_true, "abs_error": abs_error,
-        "max_abs_error": float(np.max(abs_error)), "mean_abs_error": float(np.mean(abs_error)),
+        "max_abs_error": float(np.nanmax(abs_error)), "mean_abs_error": float(np.nanmean(abs_error)),
     }
 
 
