@@ -1,15 +1,28 @@
-"""Discrete delta-hedging backtest simulation — replicating portfolio P&L analysis."""
+"""Discrete delta-hedging backtest simulation — replicating-portfolio P&L analysis."""
+
+import numpy as np
+import pandas as pd
+
+from src.pricer import black_scholes, analytics_greeks
+
+_FREQ_STEPS = {"daily": 1, "weekly": 5, "monthly": 21}
 
 
 def generate_gbm_path(
-    spot_start: float,
-    sigma: float,
-    rate: float,
-    tmat: float,
-    nsteps: int = 252 * 365,
-    seed=42,
-    drift="r",
-) -> None: ...
+    spot_start: float, sigma: float, rate: float, tmat: float,
+    nsteps: int = 252, seed: int = 42, drift: str | float = "r",
+) -> dict:
+    """Simulate one GBM spot path with a fixed seed for reproducibility."""
+    rng = np.random.default_rng(seed)
+    dt = tmat / nsteps
+    mu = rate if drift == "r" else drift
+
+    z = rng.standard_normal(nsteps)
+    log_returns = (mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * z
+    spot_path = spot_start * np.exp(np.concatenate(([0.0], np.cumsum(log_returns))))
+    times = np.linspace(0, tmat, nsteps + 1)
+
+    return {"times": times, "spot": spot_path, "dt": dt, "nsteps": nsteps, "sigma": sigma, "rate": rate}
 
 
 def delta_rebalance(
