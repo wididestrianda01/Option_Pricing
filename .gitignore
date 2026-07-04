@@ -1,0 +1,11 @@
+data/raw/
+data/processed/
+models/*.pkl
+.ipynb_checkpoints/
+.env
+kaggle.json
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
