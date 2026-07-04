@@ -37,12 +37,32 @@ def test_delta_rebalance_returns_hedge_error():
 
 
 def test_hedge_error_shrinks_monotonically_with_frequency():
-    path = generate_gbm_path(spot_start=100, sigma=0.2, rate=0.03, tmat=1.0, nsteps=252, seed=42)
-    errors = {
-        freq: abs(delta_rebalance(path, "call", 100, freq)["hedge_error"])
-        for freq in ("monthly", "weekly", "daily")
-    }
-    assert errors["daily"] <= errors["weekly"] <= errors["monthly"]
+    # Test that mean abs hedge error converges monotonically with rebalance frequency
+    # across multiple sample paths, not on a single fixed path (path-level monotonicity
+    # is path-dependent; convergence is guaranteed only in expectation across many paths).
+    num_seeds = 40
+
+    errors_by_freq = {"daily": [], "weekly": [], "monthly": []}
+
+    for seed in range(num_seeds):
+        path = generate_gbm_path(spot_start=100, sigma=0.2, rate=0.03, tmat=1.0, nsteps=252, seed=seed)
+        for freq in ("daily", "weekly", "monthly"):
+            hedge_error = delta_rebalance(path, "call", 100, freq)["hedge_error"]
+            errors_by_freq[freq].append(abs(hedge_error))
+
+    mean_errors = {freq: np.mean(errors) for freq, errors in errors_by_freq.items()}
+
+    # Monotonic convergence: more frequent rebalancing → smaller mean hedge error
+    # Allow small numerical tolerance for near-ties due to RNG variance
+    tolerance = 1e-10
+    assert mean_errors["daily"] <= mean_errors["weekly"] + tolerance, (
+        f"Expected daily mean ≤ weekly mean; got daily={mean_errors['daily']:.6f}, "
+        f"weekly={mean_errors['weekly']:.6f}"
+    )
+    assert mean_errors["weekly"] <= mean_errors["monthly"] + tolerance, (
+        f"Expected weekly mean ≤ monthly mean; got weekly={mean_errors['weekly']:.6f}, "
+        f"monthly={mean_errors['monthly']:.6f}"
+    )
 
 
 def test_int_freq_bypasses_named_presets():
