@@ -10,3 +10,8 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+docs/superpowers/plans/
+.docs/
+.claude/
+CLAUDE.md
+graphify-out/
