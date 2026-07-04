@@ -81,3 +81,15 @@ def test_iv_solver_returns_none_for_arbitrage_violating_quote():
     # Price above the S0 upper no-arbitrage bound for any positive sigma.
     result = implied_volatility(market_price=500, spot=100, strike=100, rate=0.02, tmat=1.0)
     assert result is None
+
+
+def test_iv_solver_newton_recovers_beyond_brent_bracket():
+    # Test Newton's successful recovery path when true sigma > 5.0 (Brent's bracket upper limit).
+    # Scenario: ATM call with tmat=0.5, true_sigma=6.0.
+    # Brent fails to bracket because f(1e-6) and f(5.0) have the same sign.
+    # Newton fallback (starting from sigma=0.2) successfully converges to true_sigma.
+    true_sigma = 6.0
+    quote = black_scholes(spot=100, strike=100, rate=0.02, sigma=true_sigma, tmat=0.5, option_type="call")
+    recovered_sigma = implied_volatility(quote["price"], spot=100, strike=100, rate=0.02, tmat=0.5)
+    assert recovered_sigma is not None
+    assert recovered_sigma == pytest.approx(true_sigma, abs=1e-6)
