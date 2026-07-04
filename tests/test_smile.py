@@ -66,3 +66,21 @@ def test_invert_iv_surface_validates_required_keys():
 
     # Error message should name the missing keys
     assert "strikes" in str(exc_info.value) or "missing" in str(exc_info.value).lower()
+
+
+def test_surface_skew_analysis_flags_flat_vol_violation():
+    from src.smile import surface_skew_analysis
+    smile = build_synthetic_smile(spot=100, rate=0.02, sigma_base=0.2, skew_slope=-0.3)
+    result = surface_skew_analysis(smile)
+    assert result["flat_vol_violated"] is True
+    assert len(result["atm_vol"]) == 3
+    assert len(result["skew"]) == 3
+
+
+def test_plot_smile_and_surface_returns_figure():
+    from src.smile import plot_smile_and_surface
+    smile = build_synthetic_smile(spot=100, rate=0.02, sigma_base=0.2)
+    fig = plot_smile_and_surface(smile)
+    assert fig is not None
+    import matplotlib.pyplot as plt
+    plt.close(fig)

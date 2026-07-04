@@ -1,6 +1,8 @@
 """Synthetic OMXS30 volatility surface construction and IV-inversion self-recovery test."""
 
+import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  (registers 3d projection)
 
 from src.pricer import black_scholes, implied_volatility
 
@@ -64,8 +66,46 @@ def invert_iv_surface(synthetic_smile_dict: dict) -> dict | None:
     }
 
 
-def plot_smile_and_surface(synthetic_smile_dict): ...
+def surface_skew_analysis(synthetic_smile_dict: dict) -> dict | None:
+    """ATM vol per maturity, low-strike/high-strike skew, and term-structure slope."""
+    spot = synthetic_smile_dict["spot"]
+    strikes = np.asarray(synthetic_smile_dict["strikes"])
+    maturities = synthetic_smile_dict["maturities"]
+    sigma_true = synthetic_smile_dict["sigma_true"]
+
+    atm_idx = int(np.argmin(np.abs(strikes - spot)))
+    atm_vol = sigma_true[:, atm_idx].tolist()
+    skew = (sigma_true[:, 0] - sigma_true[:, -1]).tolist()
+    term_structure_slope = float(np.polyfit(maturities, atm_vol, 1)[0])
+
+    return {
+        "atm_vol": atm_vol, "skew": skew, "term_structure_slope": term_structure_slope,
+        "flat_vol_violated": bool(max(abs(s) for s in skew) > 0.01),
+    }
 
 
-def surface_skew_analysis(synthetic_smile_dict) -> dict | None:
-    """Compute ATM, skew, and term-structure metrics; flag skew magnitude relative to BS assumption."""
+def plot_smile_and_surface(synthetic_smile_dict: dict):
+    """2D smile slices (per maturity) + 3D IV surface."""
+    strikes = synthetic_smile_dict["strikes"]
+    maturities = synthetic_smile_dict["maturities"]
+    sigma_true = synthetic_smile_dict["sigma_true"]
+
+    fig = plt.figure(figsize=(12, 5))
+
+    ax1 = fig.add_subplot(1, 2, 1)
+    for i, tmat in enumerate(maturities):
+        ax1.plot(strikes, sigma_true[i], label=f"T={tmat}y")
+    ax1.set_xlabel("Strike")
+    ax1.set_ylabel("Implied vol")
+    ax1.set_title("Volatility smile")
+    ax1.legend()
+
+    ax2 = fig.add_subplot(1, 2, 2, projection="3d")
+    strike_grid, maturity_grid = np.meshgrid(strikes, maturities)
+    ax2.plot_surface(strike_grid, maturity_grid, sigma_true, cmap="viridis")
+    ax2.set_xlabel("Strike")
+    ax2.set_ylabel("Maturity")
+    ax2.set_zlabel("Implied vol")
+    ax2.set_title("Volatility surface")
+
+    return fig
