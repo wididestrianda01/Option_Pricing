@@ -1,41 +1,53 @@
-"""CRR binomial tree pricing — cross-check against BS closed form, American exercise support."""
+"""CRR binomial tree pricer — convergence cross-check and American-exercise premium."""
+
+import numpy as np
+
+from src.pricer import black_scholes
 
 
 def crr_tree_price(
-    spot: float,
-    strike: float,
-    rate: float,
-    sigma: float,
-    tmat: float,
-    option_type: str = "call",
-    nsteps: int = 100,
+    spot: float, strike: float, rate: float, sigma: float, tmat: float,
+    option_type: str = "call", nsteps: int = 100,
 ) -> dict | None:
-    """Cox-Ross-Rubinstein binomial tree European pricing.
+    """European option price via a vectorized Cox-Ross-Rubinstein binomial tree."""
+    if nsteps < 1:
+        return None
+    dt = tmat / nsteps
+    u = np.exp(sigma * np.sqrt(dt))
+    d = 1 / u
+    p = (np.exp(rate * dt) - d) / (u - d)
+    disc = np.exp(-rate * dt)
 
-    Args:
-        spot (float): S0
-        strike (float): K
-        rate (float): r
-        sigma (float): annualised σ
-        tmat (float): T in years
-        option_type (str): 'call' or 'put' — also enables American early-exercise flag at end.
-        nsteps (int): lattice depth N
+    j = np.arange(nsteps + 1)
+    terminal_spot = spot * (u ** (nsteps - j)) * (d**j)
+    if option_type == "call":
+        values = np.maximum(terminal_spot - strike, 0.0)
+    else:
+        values = np.maximum(strike - terminal_spot, 0.0)
 
-    Returns:
-        dict with keys: price, spot, strike, rate, vol, time, type, nsteps.
-    """
+    for _ in range(nsteps):
+        values = disc * (p * values[:-1] + (1 - p) * values[1:])
+
+    return {
+        "price": float(values[0]), "spot": spot, "strike": strike, "rate": rate,
+        "vol": sigma, "time": tmat, "type": option_type, "nsteps": nsteps,
+    }
 
 
 def crr_convergence(
-    spot: float,
-    strike: float,
-    rate: float,
-    sigma: float,
-    tmat: float,
-    option_type: str = "call",
-    nsteps_grid: list[int] | None = None,
+    spot: float, strike: float, rate: float, sigma: float, tmat: float,
+    option_type: str = "call", nsteps_grid: list[int] = None,
 ) -> dict | None:
-    """Compute BS price and CRR price across increasing N; return convergence table."""
+    """Show CRR price -> BS price as N -> infinity."""
+    if nsteps_grid is None:
+        nsteps_grid = [10, 25, 50, 100, 200, 500, 1000]
+    bs_price = black_scholes(spot, strike, rate, sigma, tmat, option_type)["price"]
+    crr_prices, abs_error = [], []
+    for n in nsteps_grid:
+        crr_price = crr_tree_price(spot, strike, rate, sigma, tmat, option_type, n)["price"]
+        crr_prices.append(crr_price)
+        abs_error.append(abs(crr_price - bs_price))
+    return {"nsteps_grid": nsteps_grid, "bs_price": bs_price, "crr_prices": crr_prices, "abs_error": abs_error}
 
 
 def check_american_premia(
