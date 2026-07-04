@@ -2,6 +2,7 @@
 
 import numpy as np
 from scipy.stats import norm
+from scipy.optimize import brentq
 
 
 def black_scholes(
@@ -117,4 +118,34 @@ def put_call_parity_check(parities: list[dict]) -> None:
 def implied_volatility(
     market_price: float, spot: float, strike: float, rate: float, tmat: float
 ) -> float | None:
-    """Solve C_BS(σ) = market_price for σ via Brent's method."""
+    """Solve C_BS(σ) = market_price via Brent's method (call options),
+    with a Newton + Vega-guard fallback for cases Brent cannot bracket."""
+    vol_lo, vol_hi, tol, max_iter = 1e-6, 5.0, 1e-8, 100
+
+    def f(sigma):
+        return black_scholes(spot, strike, rate, sigma, tmat, "call")["price"] - market_price
+
+    try:
+        sigma_brent = float(brentq(f, vol_lo, vol_hi, xtol=tol, maxiter=max_iter))
+        # Validate that the solution is not at a boundary (which indicates a flat region)
+        greeks = analytics_greeks(spot, strike, rate, sigma_brent, tmat, "call")
+        if greeks is not None and abs(greeks["vega"]) > 1e-8:
+            return sigma_brent
+        # If vega is too small, the IV is unreliable; fall through to Newton
+    except ValueError:
+        pass
+
+    # Newton's method with vega-guard fallback
+    sigma = 0.2
+    for _ in range(max_iter):
+        bs = black_scholes(spot, strike, rate, sigma, tmat, "call")
+        greeks = analytics_greeks(spot, strike, rate, sigma, tmat, "call")
+        if bs is None or greeks is None or abs(greeks["vega"]) < 1e-10:
+            return None
+        diff = bs["price"] - market_price
+        if abs(diff) < tol:
+            return float(sigma)
+        sigma -= diff / greeks["vega"]
+        if sigma <= 0:
+            return None
+    return None
