@@ -84,3 +84,34 @@ def test_plot_smile_and_surface_returns_figure():
     assert fig is not None
     import matplotlib.pyplot as plt
     plt.close(fig)
+
+
+def test_surface_skew_analysis_validates_required_keys():
+    """surface_skew_analysis should raise ValueError if required keys are missing."""
+    from src.smile import surface_skew_analysis
+
+    incomplete_smile = {
+        "spot": 100,
+        # Missing: strikes, maturities, sigma_true
+    }
+
+    with pytest.raises(ValueError) as exc_info:
+        surface_skew_analysis(incomplete_smile)
+
+    # Error message should name the missing keys
+    assert "strikes" in str(exc_info.value) or "missing" in str(exc_info.value).lower()
+
+
+def test_plot_smile_and_surface_validates_required_keys():
+    """plot_smile_and_surface should raise ValueError if required keys are missing."""
+    from src.smile import plot_smile_and_surface
+
+    incomplete_smile = {
+        # Missing: strikes, maturities, sigma_true
+    }
+
+    with pytest.raises(ValueError) as exc_info:
+        plot_smile_and_surface(incomplete_smile)
+
+    # Error message should name the missing keys
+    assert "strikes" in str(exc_info.value) or "missing" in str(exc_info.value).lower()

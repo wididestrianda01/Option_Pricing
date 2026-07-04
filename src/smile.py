@@ -67,7 +67,16 @@ def invert_iv_surface(synthetic_smile_dict: dict) -> dict | None:
 
 
 def surface_skew_analysis(synthetic_smile_dict: dict) -> dict | None:
-    """ATM vol per maturity, low-strike/high-strike skew, and term-structure slope."""
+    """ATM vol per maturity, low-strike/high-strike skew, and term-structure slope.
+
+    Raises ValueError if required keys are missing from synthetic_smile_dict.
+    """
+    # Validate required keys
+    required_keys = {"spot", "strikes", "maturities", "sigma_true"}
+    missing_keys = required_keys - set(synthetic_smile_dict.keys())
+    if missing_keys:
+        raise ValueError(f"Missing required keys in synthetic_smile_dict: {sorted(missing_keys)}")
+
     spot = synthetic_smile_dict["spot"]
     strikes = np.asarray(synthetic_smile_dict["strikes"])
     maturities = synthetic_smile_dict["maturities"]
@@ -84,8 +93,17 @@ def surface_skew_analysis(synthetic_smile_dict: dict) -> dict | None:
     }
 
 
-def plot_smile_and_surface(synthetic_smile_dict: dict):
-    """2D smile slices (per maturity) + 3D IV surface."""
+def plot_smile_and_surface(synthetic_smile_dict: dict) -> plt.Figure:
+    """2D smile slices (per maturity) + 3D IV surface.
+
+    Raises ValueError if required keys are missing from synthetic_smile_dict.
+    """
+    # Validate required keys
+    required_keys = {"strikes", "maturities", "sigma_true"}
+    missing_keys = required_keys - set(synthetic_smile_dict.keys())
+    if missing_keys:
+        raise ValueError(f"Missing required keys in synthetic_smile_dict: {sorted(missing_keys)}")
+
     strikes = synthetic_smile_dict["strikes"]
     maturities = synthetic_smile_dict["maturities"]
     sigma_true = synthetic_smile_dict["sigma_true"]
