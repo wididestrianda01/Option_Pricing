@@ -47,3 +47,17 @@ def test_crr_cross_checks_against_quantlib():
     our_price = crr_tree_price(**params, nsteps=1000)["price"]
     ql_price = _quantlib_bs_price(**params)
     assert our_price == pytest.approx(ql_price, abs=0.05)
+
+
+from src.binomial import check_american_premia
+
+
+def test_american_put_premium_is_positive():
+    result = check_american_premia(spot=100, strike=110, rate=0.05, sigma=0.3, tmat=1.0, nsteps=200)
+    assert all(premium >= -1e-9 for premium in result["premium"])
+    assert any(premium > 1e-6 for premium in result["premium"])
+
+
+def test_american_premium_shape_matches_dt_grid():
+    result = check_american_premia(spot=100, strike=110, rate=0.05, sigma=0.3, tmat=1.0, nsteps=200)
+    assert len(result["premium"]) == len(result["dt"])
